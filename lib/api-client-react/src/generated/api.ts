@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import {
   useMutation,
@@ -724,7 +724,7 @@ export const getGetSessionCorrelationsUrl = (id: number,) => {
 }
 
 /**
- * @summary Get IP correlations for a session
+ * @summary Get IP correlations with threat scoring for a session
  */
 export const getSessionCorrelations = async (id: number, options?: RequestInit): Promise<IpCorrelation[]> => {
 
@@ -771,7 +771,7 @@ export type GetSessionCorrelationsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get IP correlations for a session
+ * @summary Get IP correlations with threat scoring for a session
  */
 
 export function useGetSessionCorrelations<TData = Awaited<ReturnType<typeof getSessionCorrelations>>, TError = ErrorType<unknown>>(
@@ -801,7 +801,7 @@ export const getAnalyzeSessionUrl = (id: number,) => {
 }
 
 /**
- * @summary Trigger AI analysis via n8n SOAR webhook
+ * @summary Trigger AI analysis via n8n SOAR webhook or direct Gemini
  */
 export const analyzeSession = async (id: number,
     analyzeInput: AnalyzeInput, options?: RequestInit): Promise<Report> => {
@@ -851,7 +851,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type AnalyzeSessionMutationError = ErrorType<void>
 
     /**
- * @summary Trigger AI analysis via n8n SOAR webhook
+ * @summary Trigger AI analysis via n8n SOAR webhook or direct Gemini
  */
 export const useAnalyzeSession = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeSession>>, TError,{id: number;data: BodyType<AnalyzeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1328,7 +1328,7 @@ export const getGetSourceDistributionUrl = () => {
 }
 
 /**
- * @summary Get log source distribution (FortiGate, WatchGuard, Agent)
+ * @summary Get log source distribution
  */
 export const getSourceDistribution = async ( options?: RequestInit): Promise<SourceDistributionItem[]> => {
 
@@ -1375,7 +1375,7 @@ export type GetSourceDistributionQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get log source distribution (FortiGate, WatchGuard, Agent)
+ * @summary Get log source distribution
  */
 
 export function useGetSourceDistribution<TData = Awaited<ReturnType<typeof getSourceDistribution>>, TError = ErrorType<unknown>>(

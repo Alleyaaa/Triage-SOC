@@ -1,0 +1,152 @@
+{
+  "name": "SOC Triage - AI Analysis via Gemini",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soc-analyze",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "soc-triage-analyze"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and extract payload from SOC Triage Dashboard\nconst body = $input.first().json.body;\n\nif (!body.logs || !Array.isArray(body.logs)) {\n  throw new Error('Invalid payload: missing logs array');\n}\n\n// Build correlation summary\nconst ipMap = {};\nfor (const log of body.logs) {\n  const ip = log.src_ip || 'unknown';\n  if (!ipMap[ip]) ipMap[ip] = { sources: new Set(), actions: [], ports: [] };\n  ipMap[ip].sources.add(log.source);\n  if (log.action) ipMap[ip].actions.push(log.action);\n  if (log.dst_port) ipMap[ip].ports.push(log.dst_port);\n}\n\n// Build prompt context\nconst correlationLines = Object.entries(ipMap).map(([ip, data]) => {\n  const sources = [...data.sources].join(', ');\n  const actions = data.actions.join(', ') || 'unknown';\n  const ports = [...new Set(data.ports)].join(', ') || 'N/A';\n  return `- IP: ${ip} | Sources: ${sources} | Actions: ${actions} | Ports: ${ports}`;\n}).join('\\n');\n\nconst logDetails = body.logs.map((l, i) => {\n  return `[Event ${i+1}] Source: ${l.source} | Action: ${l.action || 'unknown'} | SrcIP: ${l.src_ip} | DstPort: ${l.dst_port || 'N/A'}\\nLog: ${JSON.stringify(l.raw_log, null, 2)}`;\n}).join('\\n\\n---\\n\\n');\n\nconst prompt = `You are an expert SOC analyst. Analyze these security logs and return a JSON threat report.\n\n## IP CORRELATION SUMMARY\\n${correlationLines}\\n\\n## EVENTS (${body.logs.length} total)\\n${logDetails}\\n\\n${body.additionalContext ? `## ANALYST NOTES\\n${body.additionalContext}\\n\\n` : ''}Return ONLY valid JSON (no markdown):\\n{\\n  \"summary\": \"detailed 3-5 paragraph narrative\",\\n  \"severity\": \"critical|high|medium|low|informational\",\\n  \"iocs\": [\"list of IOCs\"],\\n  \"recommendations\": [\"actionable steps\"],\\n  \"attackVector\": \"description or null\",\\n  \"affectedSystems\": [\"hostname/IP\"],\\n  \"mitreAttackTechniques\": [\"T1078 - Valid Accounts\", ...]\\n}`;\n\nreturn [{ json: { prompt, sessionId: body.sessionId, logCount: body.logs.length } }];"
+      },
+      "id": "prepare-prompt",
+      "name": "Prepare Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "queryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "contents",
+              "value": "={{ [{\"parts\": [{\"text\": $json.prompt}]}] }}"
+            },
+            {
+              "name": "generationConfig",
+              "value": "={{ {\"temperature\": 0.3, \"maxOutputTokens\": 4096} }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "gemini-api",
+      "name": "Call Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response and extract JSON\nconst geminiResponse = $input.first().json;\nconst candidates = geminiResponse.candidates;\n\nif (!candidates || candidates.length === 0) {\n  throw new Error('Gemini returned no candidates');\n}\n\nconst text = candidates[0].content.parts[0].text.trim();\n\n// Try to extract JSON from response\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch {\n  const match = text.match(/\\{[\\s\\S]*\\}/);\n  if (!match) throw new Error('Could not parse AI response as JSON');\n  parsed = JSON.parse(match[0]);\n}\n\n// Normalize and validate fields\nconst validSeverities = ['critical', 'high', 'medium', 'low', 'informational'];\nconst severity = validSeverities.includes(parsed.severity) ? parsed.severity : 'informational';\n\nreturn [{\n  json: {\n    summary: String(parsed.summary || 'Analysis complete'),\n    severity,\n    iocs: Array.isArray(parsed.iocs) ? parsed.iocs : [],\n    recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],\n    attackVector: parsed.attackVector || null,\n    affectedSystems: Array.isArray(parsed.affectedSystems) ? parsed.affectedSystems : [],\n    mitreAttackTechniques: Array.isArray(parsed.mitreAttackTechniques) ? parsed.mitreAttackTechniques : [],\n    executionId: `n8n-${Date.now()}`\n  }\n}];"
+      },
+      "id": "parse-response",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle errors gracefully\nconst error = $input.first().json.error || 'Unknown error';\nreturn [{\n  json: {\n    summary: `Analysis failed: ${error}. Please check logs and retry.`,\n    severity: 'informational',\n    iocs: [],\n    recommendations: ['Review n8n workflow logs for error details', 'Verify GEMINI_API_KEY is set in n8n environment'],\n    attackVector: null,\n    affectedSystems: [],\n    mitreAttackTechniques: [],\n    executionId: `n8n-error-${Date.now()}`\n  }\n}];"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [{ "node": "Prepare Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Prompt": {
+      "main": [
+        [{ "node": "Call Gemini API", "type": "main", "index": 0 }]
+      ]
+    },
+    "Call Gemini API": {
+      "main": [
+        [{ "node": "Parse AI Response", "type": "main", "index": 0 }]
+      ],
+      "error": [
+        [{ "node": "Error Handler", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": ["SOC", "Security", "AI"],
+  "triggerCount": 0,
+  "versionId": "soc-triage-v1",
+  "meta": {
+    "instanceId": "soc-triage-dashboard",
+    "description": "SOC Triage Dashboard — AI Analysis workflow. Import this into n8n, set GEMINI_API_KEY env var, activate the workflow, then copy the webhook URL into the SOC Triage Dashboard Settings page."
+  }
+}

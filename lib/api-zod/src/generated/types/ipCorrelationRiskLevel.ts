@@ -6,13 +6,12 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type ReportSeverity = typeof ReportSeverity[keyof typeof ReportSeverity];
+export type IpCorrelationRiskLevel = typeof IpCorrelationRiskLevel[keyof typeof IpCorrelationRiskLevel];
 
 
-export const ReportSeverity = {
+export const IpCorrelationRiskLevel = {
   critical: 'critical',
   high: 'high',
   medium: 'medium',
   low: 'low',
-  informational: 'informational',
 } as const;

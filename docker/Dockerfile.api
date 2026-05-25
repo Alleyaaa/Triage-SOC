@@ -1,0 +1,46 @@
+FROM node:24-alpine AS base
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# ── deps ──────────────────────────────────────────────────────────────────────
+FROM base AS deps
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY lib/api-spec/package.json ./lib/api-spec/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY lib/api-zod/package.json ./lib/api-zod/
+COPY lib/db/package.json ./lib/db/
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY scripts/package.json ./scripts/
+RUN pnpm install --frozen-lockfile
+
+# ── build libs ────────────────────────────────────────────────────────────────
+FROM deps AS build
+COPY . .
+RUN pnpm run typecheck:libs
+RUN pnpm --filter @workspace/api-server run build
+
+# ── production image ──────────────────────────────────────────────────────────
+FROM node:24-alpine AS runner
+RUN corepack enable && corepack prepare pnpm@latest --activate
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY lib/api-spec/package.json ./lib/api-spec/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY lib/api-zod/package.json ./lib/api-zod/
+COPY lib/db/package.json ./lib/db/
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY scripts/package.json ./scripts/
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=build /app/artifacts/api-server/dist ./artifacts/api-server/dist
+COPY --from=build /app/lib/db/dist ./lib/db/dist
+COPY --from=build /app/lib/api-zod/dist ./lib/api-zod/dist
+
+ENV NODE_ENV=production
+ENV PORT=5000
+
+EXPOSE 5000
+
+CMD ["node", "artifacts/api-server/dist/index.cjs"]

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { LogEntrySource } from './logEntrySource';
 
@@ -14,6 +14,18 @@ export interface LogEntry {
   rawJson: string;
   /** @nullable */
   extractedIp: string | null;
+  /** @nullable */
+  dstIp?: string | null;
+  /** @nullable */
+  dstPort?: number | null;
+  /** @nullable */
+  protocol?: string | null;
+  /** @nullable */
+  actionTaken?: string | null;
+  /** @nullable */
+  logTimestamp?: string | null;
+  /** @nullable */
+  ipType?: string | null;
   masked: boolean;
   createdAt: string;
 }

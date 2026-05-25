@@ -3,22 +3,10 @@ import { db } from "@workspace/db";
 import { logEntriesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { GetSessionCorrelationsParams } from "@workspace/api-zod";
+import { maskIp, classifyIp, HIGH_RISK_PORTS } from "../lib/ip-utils";
+import { computeThreatScore, threatScoreToRisk } from "../lib/log-parser";
 
 export const correlationsRouter = Router();
-
-function maskIp(ip: string): string {
-  const parts = ip.split(".");
-  if (parts.length === 4) {
-    return `${parts[0]}.${parts[1]}.*.*`;
-  }
-  // IPv6 or unknown — mask last half
-  if (ip.includes(":")) {
-    const segments = ip.split(":");
-    const half = Math.ceil(segments.length / 2);
-    return segments.slice(0, half).join(":") + ":****:****";
-  }
-  return "***.***.***";
-}
 
 correlationsRouter.get("/sessions/:id/correlations", async (req, res): Promise<void> => {
   const parsed = GetSessionCorrelationsParams.safeParse({ id: Number(req.params.id) });
@@ -40,21 +28,63 @@ correlationsRouter.get("/sessions/:id/correlations", async (req, res): Promise<v
     ipMap.get(ip)!.push(log);
   }
 
-  const correlations = Array.from(ipMap.entries()).map(([ip, ipLogs]) => ({
-    ip,
-    maskedIp: ip === "unknown" ? "unknown" : maskIp(ip),
-    sources: [...new Set(ipLogs.map((l) => l.source))],
-    logCount: ipLogs.length,
-    logs: ipLogs.map((l) => ({
-      id: l.id,
-      sessionId: l.sessionId,
-      source: l.source,
-      rawJson: l.rawJson,
-      extractedIp: l.extractedIp ?? null,
-      masked: l.masked,
-      createdAt: l.createdAt.toISOString(),
-    })),
-  }));
+  const correlations = Array.from(ipMap.entries()).map(([ip, ipLogs]) => {
+    const ipType = ip !== "unknown" ? classifyIp(ip) : "unknown";
+    const uniqueSources = [...new Set(ipLogs.map((l) => l.source))];
+    const actions = ipLogs.map((l) => l.actionTaken);
+    const dstPorts = ipLogs.map((l) => l.dstPort);
+
+    const threatScore = computeThreatScore({
+      logCount: ipLogs.length,
+      uniqueSources,
+      actions,
+      dstPorts,
+      ipType,
+    });
+
+    const riskLevel = threatScoreToRisk(threatScore);
+
+    // Port summary with human-readable service name
+    const portsSeen = [...new Set(dstPorts.filter((p): p is number => p !== null))];
+
+    // Action summary
+    const actionSummary = {
+      blocked: actions.filter((a) => a === "blocked").length,
+      allowed: actions.filter((a) => a === "allowed").length,
+      detected: actions.filter((a) => a === "detected").length,
+      other: actions.filter((a) => a !== null && a !== "blocked" && a !== "allowed" && a !== "detected").length,
+    };
+
+    return {
+      ip,
+      maskedIp: ip === "unknown" ? "unknown" : maskIp(ip),
+      ipType,
+      sources: uniqueSources,
+      logCount: ipLogs.length,
+      threatScore,
+      riskLevel,
+      portsSeen,
+      actionSummary,
+      logs: ipLogs.map((l) => ({
+        id: l.id,
+        sessionId: l.sessionId,
+        source: l.source,
+        rawJson: l.rawJson,
+        extractedIp: l.extractedIp ?? null,
+        dstIp: l.dstIp ?? null,
+        dstPort: l.dstPort ?? null,
+        protocol: l.protocol ?? null,
+        actionTaken: l.actionTaken ?? null,
+        logTimestamp: l.logTimestamp ?? null,
+        ipType: l.ipType ?? null,
+        masked: l.masked,
+        createdAt: l.createdAt.toISOString(),
+      })),
+    };
+  });
+
+  // Sort by threat score descending
+  correlations.sort((a, b) => b.threatScore - a.threatScore);
 
   res.json(correlations);
 });

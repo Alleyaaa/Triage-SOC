@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -81,6 +81,18 @@ export interface LogEntry {
   rawJson: string;
   /** @nullable */
   extractedIp: string | null;
+  /** @nullable */
+  dstIp?: string | null;
+  /** @nullable */
+  dstPort?: number | null;
+  /** @nullable */
+  protocol?: string | null;
+  /** @nullable */
+  actionTaken?: string | null;
+  /** @nullable */
+  logTimestamp?: string | null;
+  /** @nullable */
+  ipType?: string | null;
   masked: boolean;
   createdAt: string;
 }
@@ -106,6 +118,7 @@ export interface Report {
   /** @nullable */
   attackVector?: string | null;
   affectedSystems?: string[];
+  mitreAttackTechniques?: string[];
   rawAiResponse: string;
   /** @nullable */
   n8nExecutionId?: string | null;
@@ -140,11 +153,34 @@ export interface LogEntryInput {
   rawJson: string;
 }
 
+export type IpCorrelationRiskLevel = typeof IpCorrelationRiskLevel[keyof typeof IpCorrelationRiskLevel];
+
+
+export const IpCorrelationRiskLevel = {
+  critical: 'critical',
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export type IpCorrelationActionSummary = {
+  blocked: number;
+  allowed: number;
+  detected: number;
+  other: number;
+};
+
 export interface IpCorrelation {
   ip: string;
   maskedIp: string;
+  ipType: string;
   sources: string[];
   logCount: number;
+  /** 0-100 threat score computed from multi-source correlation, port risk, and action analysis */
+  threatScore: number;
+  riskLevel: IpCorrelationRiskLevel;
+  portsSeen?: number[];
+  actionSummary?: IpCorrelationActionSummary;
   logs: LogEntry[];
 }
 

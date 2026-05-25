@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from './activityItem';
@@ -12,6 +12,8 @@ export * from './analyzeInput';
 export * from './dashboardStats';
 export * from './healthStatus';
 export * from './ipCorrelation';
+export * from './ipCorrelationActionSummary';
+export * from './ipCorrelationRiskLevel';
 export * from './logEntry';
 export * from './logEntryInput';
 export * from './logEntryInputSource';

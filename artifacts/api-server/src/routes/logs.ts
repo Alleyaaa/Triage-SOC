@@ -8,23 +8,27 @@ import {
   AddLogToSessionBody,
   RemoveLogFromSessionParams,
 } from "@workspace/api-zod";
+import { parseLogEntry } from "../lib/log-parser";
+import type { LogSource } from "../lib/log-parser";
 
 export const logsRouter = Router();
 
-function extractIpFromJson(rawJson: string, source: string): string | null {
-  try {
-    const obj = JSON.parse(rawJson);
-    if (source === "fortigate" && obj?.data?.srcip) return String(obj.data.srcip);
-    if ((source === "agent_windows" || source === "agent_linux") && obj?.agent?.ip) return String(obj.agent.ip);
-    if (source === "watchguard" && obj?.data?.watchguard?.ip_address) return String(obj.data.watchguard.ip_address);
-    // Try all fields as fallback
-    if (obj?.data?.srcip) return String(obj.data.srcip);
-    if (obj?.agent?.ip) return String(obj.agent.ip);
-    if (obj?.data?.watchguard?.ip_address) return String(obj.data.watchguard.ip_address);
-  } catch {
-    // ignore parse errors
-  }
-  return null;
+function serializeLog(l: typeof logEntriesTable.$inferSelect) {
+  return {
+    id: l.id,
+    sessionId: l.sessionId,
+    source: l.source,
+    rawJson: l.rawJson,
+    extractedIp: l.extractedIp ?? null,
+    dstIp: l.dstIp ?? null,
+    dstPort: l.dstPort ?? null,
+    protocol: l.protocol ?? null,
+    actionTaken: l.actionTaken ?? null,
+    logTimestamp: l.logTimestamp ?? null,
+    ipType: l.ipType ?? null,
+    masked: l.masked,
+    createdAt: l.createdAt.toISOString(),
+  };
 }
 
 logsRouter.get("/sessions/:id/logs", async (req, res): Promise<void> => {
@@ -38,17 +42,7 @@ logsRouter.get("/sessions/:id/logs", async (req, res): Promise<void> => {
     .from(logEntriesTable)
     .where(eq(logEntriesTable.sessionId, parsed.data.id));
 
-  res.json(
-    logs.map((l) => ({
-      id: l.id,
-      sessionId: l.sessionId,
-      source: l.source,
-      rawJson: l.rawJson,
-      extractedIp: l.extractedIp ?? null,
-      masked: l.masked,
-      createdAt: l.createdAt.toISOString(),
-    }))
-  );
+  res.json(logs.map(serializeLog));
 });
 
 logsRouter.post("/sessions/:id/logs", async (req, res): Promise<void> => {
@@ -59,28 +53,26 @@ logsRouter.post("/sessions/:id/logs", async (req, res): Promise<void> => {
     return;
   }
 
-  const extractedIp = extractIpFromJson(bodyParsed.data.rawJson, bodyParsed.data.source);
+  const meta = parseLogEntry(bodyParsed.data.rawJson, bodyParsed.data.source as LogSource);
 
   const [log] = await db
     .insert(logEntriesTable)
     .values({
       sessionId: paramsParsed.data.id,
-      source: bodyParsed.data.source,
+      source: meta.detectedSource,
       rawJson: bodyParsed.data.rawJson,
-      extractedIp,
+      extractedIp: meta.extractedIp,
+      dstIp: meta.dstIp,
+      dstPort: meta.dstPort,
+      protocol: meta.protocol,
+      actionTaken: meta.actionTaken,
+      logTimestamp: meta.logTimestamp,
+      ipType: meta.ipType,
       masked: false,
     })
     .returning();
 
-  res.status(201).json({
-    id: log.id,
-    sessionId: log.sessionId,
-    source: log.source,
-    rawJson: log.rawJson,
-    extractedIp: log.extractedIp ?? null,
-    masked: log.masked,
-    createdAt: log.createdAt.toISOString(),
-  });
+  res.status(201).json(serializeLog(log));
 });
 
 logsRouter.delete("/sessions/:id/logs/:logId", async (req, res): Promise<void> => {

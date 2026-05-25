@@ -3,14 +3,22 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
+import type { IpCorrelationActionSummary } from './ipCorrelationActionSummary';
+import type { IpCorrelationRiskLevel } from './ipCorrelationRiskLevel';
 import type { LogEntry } from './logEntry';
 
 export interface IpCorrelation {
   ip: string;
   maskedIp: string;
+  ipType: string;
   sources: string[];
   logCount: number;
+  /** 0-100 threat score computed from multi-source correlation, port risk, and action analysis */
+  threatScore: number;
+  riskLevel: IpCorrelationRiskLevel;
+  portsSeen?: number[];
+  actionSummary?: IpCorrelationActionSummary;
   logs: LogEntry[];
 }

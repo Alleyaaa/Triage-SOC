@@ -8,6 +8,12 @@ export const logEntriesTable = pgTable("log_entries", {
   source: text("source").notNull().default("unknown"),
   rawJson: text("raw_json").notNull(),
   extractedIp: text("extracted_ip"),
+  dstIp: text("dst_ip"),
+  dstPort: integer("dst_port"),
+  protocol: text("protocol"),
+  actionTaken: text("action_taken"),
+  logTimestamp: text("log_timestamp"),
+  ipType: text("ip_type"),
   masked: boolean("masked").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

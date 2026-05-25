@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from 'zod';
 
@@ -62,6 +62,12 @@ export const GetSessionResponse = zod.object({
   "source": zod.enum(['fortigate', 'watchguard', 'agent_windows', 'agent_linux', 'unknown']),
   "rawJson": zod.string(),
   "extractedIp": zod.string().nullable(),
+  "dstIp": zod.string().nullish(),
+  "dstPort": zod.number().nullish(),
+  "protocol": zod.string().nullish(),
+  "actionTaken": zod.string().nullish(),
+  "logTimestamp": zod.string().nullish(),
+  "ipType": zod.string().nullish(),
   "masked": zod.boolean(),
   "createdAt": zod.string()
 })),
@@ -74,6 +80,7 @@ export const GetSessionResponse = zod.object({
   "recommendations": zod.array(zod.string()),
   "attackVector": zod.string().nullish(),
   "affectedSystems": zod.array(zod.string()).optional(),
+  "mitreAttackTechniques": zod.array(zod.string()).optional(),
   "rawAiResponse": zod.string(),
   "n8nExecutionId": zod.string().nullish(),
   "createdAt": zod.string()
@@ -129,6 +136,12 @@ export const GetSessionLogsResponseItem = zod.object({
   "source": zod.enum(['fortigate', 'watchguard', 'agent_windows', 'agent_linux', 'unknown']),
   "rawJson": zod.string(),
   "extractedIp": zod.string().nullable(),
+  "dstIp": zod.string().nullish(),
+  "dstPort": zod.number().nullish(),
+  "protocol": zod.string().nullish(),
+  "actionTaken": zod.string().nullish(),
+  "logTimestamp": zod.string().nullish(),
+  "ipType": zod.string().nullish(),
   "masked": zod.boolean(),
   "createdAt": zod.string()
 })
@@ -158,7 +171,7 @@ export const RemoveLogFromSessionParams = zod.object({
 
 
 /**
- * @summary Get IP correlations for a session
+ * @summary Get IP correlations with threat scoring for a session
  */
 export const GetSessionCorrelationsParams = zod.object({
   "id": zod.coerce.number()
@@ -167,14 +180,30 @@ export const GetSessionCorrelationsParams = zod.object({
 export const GetSessionCorrelationsResponseItem = zod.object({
   "ip": zod.string(),
   "maskedIp": zod.string(),
+  "ipType": zod.string(),
   "sources": zod.array(zod.string()),
   "logCount": zod.number(),
+  "threatScore": zod.number().describe('0-100 threat score computed from multi-source correlation, port risk, and action analysis'),
+  "riskLevel": zod.enum(['critical', 'high', 'medium', 'low']),
+  "portsSeen": zod.array(zod.number()).optional(),
+  "actionSummary": zod.object({
+  "blocked": zod.number(),
+  "allowed": zod.number(),
+  "detected": zod.number(),
+  "other": zod.number()
+}).optional(),
   "logs": zod.array(zod.object({
   "id": zod.number(),
   "sessionId": zod.number(),
   "source": zod.enum(['fortigate', 'watchguard', 'agent_windows', 'agent_linux', 'unknown']),
   "rawJson": zod.string(),
   "extractedIp": zod.string().nullable(),
+  "dstIp": zod.string().nullish(),
+  "dstPort": zod.number().nullish(),
+  "protocol": zod.string().nullish(),
+  "actionTaken": zod.string().nullish(),
+  "logTimestamp": zod.string().nullish(),
+  "ipType": zod.string().nullish(),
   "masked": zod.boolean(),
   "createdAt": zod.string()
 }))
@@ -183,7 +212,7 @@ export const GetSessionCorrelationsResponse = zod.array(GetSessionCorrelationsRe
 
 
 /**
- * @summary Trigger AI analysis via n8n SOAR webhook
+ * @summary Trigger AI analysis via n8n SOAR webhook or direct Gemini
  */
 export const AnalyzeSessionParams = zod.object({
   "id": zod.coerce.number()
@@ -203,6 +232,7 @@ export const AnalyzeSessionResponse = zod.object({
   "recommendations": zod.array(zod.string()),
   "attackVector": zod.string().nullish(),
   "affectedSystems": zod.array(zod.string()).optional(),
+  "mitreAttackTechniques": zod.array(zod.string()).optional(),
   "rawAiResponse": zod.string(),
   "n8nExecutionId": zod.string().nullish(),
   "createdAt": zod.string()
@@ -221,6 +251,7 @@ export const ListReportsResponseItem = zod.object({
   "recommendations": zod.array(zod.string()),
   "attackVector": zod.string().nullish(),
   "affectedSystems": zod.array(zod.string()).optional(),
+  "mitreAttackTechniques": zod.array(zod.string()).optional(),
   "rawAiResponse": zod.string(),
   "n8nExecutionId": zod.string().nullish(),
   "createdAt": zod.string()
@@ -244,6 +275,7 @@ export const GetReportResponse = zod.object({
   "recommendations": zod.array(zod.string()),
   "attackVector": zod.string().nullish(),
   "affectedSystems": zod.array(zod.string()).optional(),
+  "mitreAttackTechniques": zod.array(zod.string()).optional(),
   "rawAiResponse": zod.string(),
   "n8nExecutionId": zod.string().nullish(),
   "createdAt": zod.string()
@@ -297,7 +329,7 @@ export const GetThreatBreakdownResponse = zod.array(GetThreatBreakdownResponseIt
 
 
 /**
- * @summary Get log source distribution (FortiGate, WatchGuard, Agent)
+ * @summary Get log source distribution
  */
 export const GetSourceDistributionResponseItem = zod.object({
   "source": zod.string(),

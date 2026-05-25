@@ -1,22 +1,17 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: SOC Triage Dashboard API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: sessions
-    description: Triage session operations
   - name: logs
-    description: Log entry operations
   - name: reports
-    description: Analysis report operations
   - name: dashboard
-    description: Dashboard summary operations
 
 paths:
   /healthz:
@@ -189,7 +184,7 @@ paths:
     get:
       operationId: getSessionCorrelations
       tags: [sessions]
-      summary: Get IP correlations for a session
+      summary: Get IP correlations with threat scoring for a session
       parameters:
         - name: id
           in: path
@@ -210,7 +205,7 @@ paths:
     post:
       operationId: analyzeSession
       tags: [sessions]
-      summary: Trigger AI analysis via n8n SOAR webhook
+      summary: Trigger AI analysis via n8n SOAR webhook or direct Gemini
       parameters:
         - name: id
           in: path
@@ -329,7 +324,7 @@ paths:
     get:
       operationId: getSourceDistribution
       tags: [dashboard]
-      summary: Get log source distribution (FortiGate, WatchGuard, Agent)
+      summary: Get log source distribution
       responses:
         "200":
           description: Source distribution
@@ -461,6 +456,18 @@ components:
           type: string
         extractedIp:
           type: ["string", "null"]
+        dstIp:
+          type: ["string", "null"]
+        dstPort:
+          type: ["integer", "null"]
+        protocol:
+          type: ["string", "null"]
+        actionTaken:
+          type: ["string", "null"]
+        logTimestamp:
+          type: ["string", "null"]
+        ipType:
+          type: ["string", "null"]
         masked:
           type: boolean
         createdAt:
@@ -478,11 +485,13 @@ components:
 
     IpCorrelation:
       type: object
-      required: [ip, maskedIp, sources, logCount, logs]
+      required: [ip, maskedIp, sources, logCount, threatScore, riskLevel, ipType, logs]
       properties:
         ip:
           type: string
         maskedIp:
+          type: string
+        ipType:
           type: string
         sources:
           type: array
@@ -490,6 +499,28 @@ components:
             type: string
         logCount:
           type: integer
+        threatScore:
+          type: integer
+          description: 0-100 threat score computed from multi-source correlation, port risk, and action analysis
+        riskLevel:
+          type: string
+          enum: [critical, high, medium, low]
+        portsSeen:
+          type: array
+          items:
+            type: integer
+        actionSummary:
+          type: object
+          properties:
+            blocked:
+              type: integer
+            allowed:
+              type: integer
+            detected:
+              type: integer
+            other:
+              type: integer
+          required: [blocked, allowed, detected, other]
         logs:
           type: array
           items:
@@ -528,6 +559,10 @@ components:
         attackVector:
           type: ["string", "null"]
         affectedSystems:
+          type: array
+          items:
+            type: string
+        mitreAttackTechniques:
           type: array
           items:
             type: string

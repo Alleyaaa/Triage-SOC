@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface SourceDistributionItem {
-  source: string;
-  count: number;
-}
+export type IpCorrelationActionSummary = {
+  blocked: number;
+  allowed: number;
+  detected: number;
+  other: number;
+};

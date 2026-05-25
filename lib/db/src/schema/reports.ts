@@ -11,6 +11,7 @@ export const reportsTable = pgTable("reports", {
   recommendations: text("recommendations").array().notNull().default([]),
   attackVector: text("attack_vector"),
   affectedSystems: text("affected_systems").array().notNull().default([]),
+  mitreAttackTechniques: text("mitre_attack_techniques").array().notNull().default([]),
   rawAiResponse: text("raw_ai_response").notNull(),
   n8nExecutionId: text("n8n_execution_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

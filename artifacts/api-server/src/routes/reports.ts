@@ -6,27 +6,29 @@ import { GetReportParams, DeleteReportParams } from "@workspace/api-zod";
 
 export const reportsRouter = Router();
 
+function serializeReport(r: typeof reportsTable.$inferSelect) {
+  return {
+    id: r.id,
+    sessionId: r.sessionId,
+    summary: r.summary,
+    severity: r.severity,
+    iocs: r.iocs,
+    recommendations: r.recommendations,
+    attackVector: r.attackVector ?? null,
+    affectedSystems: r.affectedSystems,
+    mitreAttackTechniques: r.mitreAttackTechniques ?? [],
+    rawAiResponse: r.rawAiResponse,
+    n8nExecutionId: r.n8nExecutionId ?? null,
+    createdAt: r.createdAt.toISOString(),
+  };
+}
+
 reportsRouter.get("/reports", async (req, res): Promise<void> => {
   const reports = await db
     .select()
     .from(reportsTable)
     .orderBy(sql`${reportsTable.createdAt} desc`);
-
-  res.json(
-    reports.map((r) => ({
-      id: r.id,
-      sessionId: r.sessionId,
-      summary: r.summary,
-      severity: r.severity,
-      iocs: r.iocs,
-      recommendations: r.recommendations,
-      attackVector: r.attackVector ?? null,
-      affectedSystems: r.affectedSystems,
-      rawAiResponse: r.rawAiResponse,
-      n8nExecutionId: r.n8nExecutionId ?? null,
-      createdAt: r.createdAt.toISOString(),
-    }))
-  );
+  res.json(reports.map(serializeReport));
 });
 
 reportsRouter.get("/reports/:id", async (req, res): Promise<void> => {
@@ -45,19 +47,7 @@ reportsRouter.get("/reports/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({
-    id: report.id,
-    sessionId: report.sessionId,
-    summary: report.summary,
-    severity: report.severity,
-    iocs: report.iocs,
-    recommendations: report.recommendations,
-    attackVector: report.attackVector ?? null,
-    affectedSystems: report.affectedSystems,
-    rawAiResponse: report.rawAiResponse,
-    n8nExecutionId: report.n8nExecutionId ?? null,
-    createdAt: report.createdAt.toISOString(),
-  });
+  res.json(serializeReport(report));
 });
 
 reportsRouter.delete("/reports/:id", async (req, res): Promise<void> => {

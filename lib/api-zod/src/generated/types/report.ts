@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC Triage Dashboard API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { ReportSeverity } from './reportSeverity';
 
@@ -17,6 +17,7 @@ export interface Report {
   /** @nullable */
   attackVector?: string | null;
   affectedSystems?: string[];
+  mitreAttackTechniques?: string[];
   rawAiResponse: string;
   /** @nullable */
   n8nExecutionId?: string | null;
