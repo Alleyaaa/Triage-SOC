@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SOC Triage Dashboard API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: sessions
+    description: Triage session operations
+  - name: logs
+    description: Log entry operations
+  - name: reports
+    description: Analysis report operations
+  - name: dashboard
+    description: Dashboard summary operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,580 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all triage sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new triage session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{id}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSession
+      tags: [sessions]
+      summary: Update session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sessions/{id}/logs:
+    get:
+      operationId: getSessionLogs
+      tags: [logs]
+      summary: Get logs for a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Logs list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+    post:
+      operationId: addLogToSession
+      tags: [logs]
+      summary: Add a log entry to a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogEntryInput"
+      responses:
+        "201":
+          description: Log entry added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogEntry"
+
+  /sessions/{id}/logs/{logId}:
+    delete:
+      operationId: removeLogFromSession
+      tags: [logs]
+      summary: Remove a log entry from session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: logId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /sessions/{id}/correlations:
+    get:
+      operationId: getSessionCorrelations
+      tags: [sessions]
+      summary: Get IP correlations for a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: IP correlations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IpCorrelation"
+
+  /sessions/{id}/analyze:
+    post:
+      operationId: analyzeSession
+      tags: [sessions]
+      summary: Trigger AI analysis via n8n SOAR webhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeInput"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "400":
+          description: Bad request
+
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List all saved reports
+      responses:
+        "200":
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get report detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteReport
+      tags: [reports]
+      summary: Delete report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent session and report activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/threat-breakdown:
+    get:
+      operationId: getThreatBreakdown
+      tags: [dashboard]
+      summary: Get threat severity breakdown across all reports
+      responses:
+        "200":
+          description: Threat breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ThreatBreakdownItem"
+
+  /dashboard/source-distribution:
+    get:
+      operationId: getSourceDistribution
+      tags: [dashboard]
+      summary: Get log source distribution (FortiGate, WatchGuard, Agent)
+      responses:
+        "200":
+          description: Source distribution
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SourceDistributionItem"
+
+  /n8n/config:
+    get:
+      operationId: getN8nConfig
+      tags: [sessions]
+      summary: Get current n8n webhook configuration
+      responses:
+        "200":
+          description: n8n config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/N8nConfig"
+    put:
+      operationId: updateN8nConfig
+      tags: [sessions]
+      summary: Update n8n webhook URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/N8nConfigInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/N8nConfig"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    Session:
+      type: object
+      required: [id, title, status, logCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, analyzing, analyzed, closed]
+        logCount:
+          type: integer
+        hasReport:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    SessionInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+
+    SessionUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, analyzing, analyzed, closed]
+
+    SessionDetail:
+      type: object
+      required: [id, title, status, logs, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, analyzing, analyzed, closed]
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+        report:
+          $ref: "#/components/schemas/Report"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    LogEntry:
+      type: object
+      required: [id, sessionId, source, rawJson, extractedIp, masked, createdAt]
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        source:
+          type: string
+          enum: [fortigate, watchguard, agent_windows, agent_linux, unknown]
+        rawJson:
+          type: string
+        extractedIp:
+          type: ["string", "null"]
+        masked:
+          type: boolean
+        createdAt:
+          type: string
+
+    LogEntryInput:
+      type: object
+      required: [source, rawJson]
+      properties:
+        source:
+          type: string
+          enum: [fortigate, watchguard, agent_windows, agent_linux, unknown]
+        rawJson:
+          type: string
+
+    IpCorrelation:
+      type: object
+      required: [ip, maskedIp, sources, logCount, logs]
+      properties:
+        ip:
+          type: string
+        maskedIp:
+          type: string
+        sources:
+          type: array
+          items:
+            type: string
+        logCount:
+          type: integer
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogEntry"
+
+    AnalyzeInput:
+      type: object
+      required: [maskIps]
+      properties:
+        maskIps:
+          type: boolean
+        additionalContext:
+          type: string
+
+    Report:
+      type: object
+      required: [id, sessionId, summary, severity, iocs, recommendations, rawAiResponse, createdAt]
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: integer
+        summary:
+          type: string
+        severity:
+          type: string
+          enum: [critical, high, medium, low, informational]
+        iocs:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        attackVector:
+          type: ["string", "null"]
+        affectedSystems:
+          type: array
+          items:
+            type: string
+        rawAiResponse:
+          type: string
+        n8nExecutionId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    DashboardStats:
+      type: object
+      required: [totalSessions, openSessions, analyzedSessions, totalReports, totalLogs, criticalCount, highCount]
+      properties:
+        totalSessions:
+          type: integer
+        openSessions:
+          type: integer
+        analyzedSessions:
+          type: integer
+        totalReports:
+          type: integer
+        totalLogs:
+          type: integer
+        criticalCount:
+          type: integer
+        highCount:
+          type: integer
+
+    ActivityItem:
+      type: object
+      required: [id, type, title, description, timestamp]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [session_created, session_analyzed, report_generated, log_added]
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+
+    ThreatBreakdownItem:
+      type: object
+      required: [severity, count]
+      properties:
+        severity:
+          type: string
+        count:
+          type: integer
+
+    SourceDistributionItem:
+      type: object
+      required: [source, count]
+      properties:
+        source:
+          type: string
+        count:
+          type: integer
+
+    N8nConfig:
+      type: object
+      required: [webhookUrl, isConfigured]
+      properties:
+        webhookUrl:
+          type: ["string", "null"]
+        isConfigured:
+          type: boolean
+
+    N8nConfigInput:
+      type: object
+      required: [webhookUrl]
+      properties:
+        webhookUrl:
+          type: string
