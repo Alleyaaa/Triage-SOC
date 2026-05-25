@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Sessions from "@/pages/Sessions";
 import SessionWorkspace from "@/pages/SessionWorkspace";
+import SessionTimeline from "@/pages/SessionTimeline";
 import Reports from "@/pages/Reports";
 import ReportDetail from "@/pages/ReportDetail";
 import Settings from "@/pages/Settings";
@@ -20,6 +21,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/sessions" component={Sessions} />
+        <Route path="/sessions/:id/timeline" component={SessionTimeline} />
         <Route path="/sessions/:id" component={SessionWorkspace} />
         <Route path="/reports" component={Reports} />
         <Route path="/reports/:id" component={ReportDetail} />

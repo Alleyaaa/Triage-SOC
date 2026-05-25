@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SourceBadge, StatusBadge, SeverityBadge } from "@/components/ui/badges";
-import { ArrowLeft, Plus, BrainCircuit, Trash2, ShieldAlert, Shield, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, BrainCircuit, Trash2, ShieldAlert, Shield, AlertTriangle, GitBranch } from "lucide-react";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -190,6 +190,11 @@ export default function SessionWorkspace() {
               ? "Analyzing..."
               : "Analyze with AI"}
           </Button>
+          <Link href={`/sessions/${sessionId}/timeline`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <GitBranch className="h-4 w-4" /> Timeline
+            </Button>
+          </Link>
           {session.status === "open" ? (
             <Button
               variant="outline"
