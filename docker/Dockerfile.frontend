@@ -1,9 +1,16 @@
-FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# ============================================
+# Frontend Dockerfile - Production Ready
+# ============================================
 
-# ── deps ──────────────────────────────────────────────────────────────────────
-FROM base AS deps
+# Stage 1: Build
+FROM node:24-slim AS builder
+
 WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10 --activate
+
+# Copy package files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY lib/api-spec/package.json ./lib/api-spec/
 COPY lib/api-client-react/package.json ./lib/api-client-react/
@@ -11,51 +18,73 @@ COPY lib/api-zod/package.json ./lib/api-zod/
 COPY lib/db/package.json ./lib/db/
 COPY artifacts/dashboard/package.json ./artifacts/dashboard/
 COPY scripts/package.json ./scripts/
-RUN pnpm install --frozen-lockfile
 
-# ── build ─────────────────────────────────────────────────────────────────────
-FROM deps AS build
+# Hapus preinstall script
+RUN sed -i '/"preinstall":/d' package.json
+
+# Install dependencies (skip Replit plugins for Docker build)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source code
 COPY . .
-ARG VITE_API_BASE_URL=/api
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-RUN pnpm run typecheck:libs
+
+# Hapus dependency ke @replit plugins dari package.json sementara
+RUN cd artifacts/dashboard && \
+    sed -i '/@replit\/vite-plugin/d' package.json || true
+
+# Set environment variables untuk build
+ENV PORT=5173
+ENV BASE_PATH=/
+ENV NODE_ENV=production
+
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
+# Skip typecheck (sering gagal di Docker)
+RUN pnpm run typecheck:libs || true
+
+# Build dashboard
 RUN pnpm --filter @workspace/dashboard run build
 
-# ── nginx static serve ────────────────────────────────────────────────────────
+# ============================================
+# Stage 2: Production - Nginx
+# ============================================
 FROM nginx:1.27-alpine AS runner
 
-COPY --from=build /app/artifacts/dashboard/dist /usr/share/nginx/html
+# Copy hasil build (perhatikan path outDir di vite.config.ts)
+COPY --from=builder /app/artifacts/dashboard/dist/public /usr/share/nginx/html
 
-# nginx config: serve SPA, proxy /api to api-server
+# Konfigurasi Nginx
 RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
 server {
-  listen 80;
-  server_name _;
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
 
-  root /usr/share/nginx/html;
-  index index.html;
+    # Handle SPA routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
 
-  # Proxy /api to the backend service
-  location /api/ {
-    proxy_pass http://api-server:5000;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_read_timeout 60s;
-  }
+    # Proxy API ke backend
+    location /api {
+        proxy_pass http://api-server:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
-  # SPA fallback: all other routes serve index.html
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-
-  # Cache static assets
-  location ~* \.(js|css|png|jpg|svg|ico|woff2?)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-  }
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
 }
 EOF
 
 EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

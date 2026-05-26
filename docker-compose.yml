@@ -46,13 +46,15 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
     container_name: soc-triage-frontend
     restart: unless-stopped
     depends_on:
       api-server:
         condition: service_healthy
     ports:
-      - "80:80"
+      - "3000:80"
 
 volumes:
   postgres_data:
